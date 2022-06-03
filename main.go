@@ -16,10 +16,12 @@ func main() {
 	}
 
 	strategies := map[string]func(){
-		"baseline":         baseline,
-		"withBufio":        withBufio,
-		"writeBytes":       writeBytes,
-		"writeByteBuffers": writeByteBuffers,
+		"baseline":          baseline,
+		"withTemplate":      withTemplate,
+		"withBufio":         withBufio,
+		"withTemplateBufio": withTemplateBufio,
+		"writeBytes":        writeBytes,
+		"writeByteBuffers":  writeByteBuffers,
 	}
 
 	if f, ok := strategies[os.Args[1]]; ok {
@@ -45,6 +47,30 @@ func baseline() {
 	}
 }
 
+const templateString = `FizzBuzz
+%d
+%d
+Fizz
+%d
+Buzz
+Fizz
+%d
+%d
+Fizz
+Buzz
+%d
+Fizz
+%d
+%d
+`
+
+// ~45 MiB/s
+func withTemplate() {
+	for i := 0; i < limit; i += 15 {
+		fmt.Printf(templateString, i+1, i+2, i+4, i+7, i+8, i+11, i+13, i+14)
+	}
+}
+
 // ~62 MiB/s
 func withBufio() {
 	b := bufio.NewWriter(os.Stdout)
@@ -60,6 +86,14 @@ func withBufio() {
 		}
 	}
 	b.Flush()
+}
+
+// ~104 MiB/s
+func withTemplateBufio() {
+	b := bufio.NewWriter(os.Stdout)
+	for i := 0; i < limit; i += 15 {
+		b.WriteString(fmt.Sprintf(templateString, i+1, i+2, i+4, i+7, i+8, i+11, i+13, i+14))
+	}
 }
 
 // ~5.9 MiB/s
