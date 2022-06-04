@@ -51,8 +51,7 @@ func baseline() {
 }
 
 const templateSize = 15
-const templateString = `FizzBuzz
-%d
+const templateString = `%d
 %d
 Fizz
 %d
@@ -66,6 +65,7 @@ Buzz
 Fizz
 %d
 %d
+FizzBuzz
 `
 
 // ~116 MiB/s
