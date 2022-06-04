@@ -7,7 +7,7 @@ import (
 	"strconv"
 )
 
-const limit = 1 << 31
+const limit = 1 << 32
 
 func main() {
 
@@ -16,12 +16,13 @@ func main() {
 	}
 
 	strategies := map[string]func(){
-		"baseline":          baseline,
-		"withTemplate":      withTemplate,
-		"withBufio":         withBufio,
-		"withTemplateBufio": withTemplateBufio,
-		"writeBytes":        writeBytes,
-		"writeByteBuffers":  writeByteBuffers,
+		"baseline":                 baseline,
+		"withTemplate":             withTemplate,
+		"withBufio":                withBufio,
+		"withTemplateBufio":        withTemplateBufio,
+		"writeBytes":               writeBytes,
+		"writeByteBuffers":         writeByteBuffers,
+		"writeTemplateByteBuffers": writeTemplateByteBuffers,
 	}
 
 	if f, ok := strategies[os.Args[1]]; ok {
@@ -47,6 +48,7 @@ func baseline() {
 	}
 }
 
+const templateSize = 15
 const templateString = `FizzBuzz
 %d
 %d
@@ -66,7 +68,7 @@ Fizz
 
 // ~45 MiB/s
 func withTemplate() {
-	for i := 0; i < limit; i += 15 {
+	for i := 0; i < limit; i += templateSize {
 		fmt.Printf(templateString, i+1, i+2, i+4, i+7, i+8, i+11, i+13, i+14)
 	}
 }
@@ -91,7 +93,7 @@ func withBufio() {
 // ~104 MiB/s
 func withTemplateBufio() {
 	b := bufio.NewWriter(os.Stdout)
-	for i := 0; i < limit; i += 15 {
+	for i := 0; i < limit; i += templateSize {
 		b.WriteString(fmt.Sprintf(templateString, i+1, i+2, i+4, i+7, i+8, i+11, i+13, i+14))
 	}
 }
@@ -147,6 +149,29 @@ func writeByteBuffers() {
 		} else {
 			bytes = []byte(strconv.Itoa(i) + "\n")
 		}
+
+		if bufPtr+len(bytes) >= bufSize {
+			f.Write(buffer[:bufPtr])
+			bufPtr = 0
+		}
+
+		copy(buffer[bufPtr:], bytes)
+		bufPtr += len(bytes)
+	}
+
+	f.Write(buffer[:bufPtr])
+}
+
+// ~99 MiB/s
+func writeTemplateByteBuffers() {
+	f := os.Stdout
+
+	const bufSize = 16384
+	bufPtr := 0
+	buffer := make([]byte, bufSize)
+
+	for i := 0; i < limit; i += templateSize {
+		bytes := []byte(fmt.Sprintf(templateString, i+1, i+2, i+4, i+7, i+8, i+11, i+13, i+14))
 
 		if bufPtr+len(bytes) >= bufSize {
 			f.Write(buffer[:bufPtr])
