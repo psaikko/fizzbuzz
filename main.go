@@ -23,6 +23,7 @@ func main() {
 		"writeBytes":               writeBytes,
 		"writeByteBuffers":         writeByteBuffers,
 		"writeTemplateByteBuffers": writeTemplateByteBuffers,
+		"parallelTemplateBuffers":  parallelTemplateBuffers,
 	}
 
 	if f, ok := strategies[os.Args[1]]; ok {
@@ -183,4 +184,56 @@ func writeTemplateByteBuffers() {
 	}
 
 	f.Write(buffer[:bufPtr])
+}
+
+const jobSize = 1000
+
+func worker(out chan<- []byte, in <-chan int) {
+	linesPerJob := jobSize * templateSize
+	buffer := make([]byte, 0, linesPerJob)
+	swapBuffer := make([]byte, 0, linesPerJob)
+
+	for jobIndex := range in {
+
+		start := jobIndex * linesPerJob
+		end := (jobIndex + 1) * linesPerJob
+
+		for i := start; i < end; i += templateSize {
+			bytes := []byte(fmt.Sprintf(templateString, i+1, i+2, i+4, i+7, i+8, i+11, i+13, i+14))
+			buffer = append(buffer, bytes...)
+		}
+		out <- buffer
+		buffer, swapBuffer = swapBuffer, buffer
+		buffer = buffer[:0]
+	}
+
+}
+
+// ~200 MiB/s
+func parallelTemplateBuffers() {
+
+	const nThreads = 4
+	bufferChannels := make([]chan []byte, nThreads)
+	jobChannels := make([]chan int, nThreads)
+
+	for i := 0; i < nThreads; i++ {
+		bufferChannels[i] = make(chan []byte)
+		jobChannels[i] = make(chan int)
+	}
+
+	jobIndex := 0
+
+	for i := 0; i < nThreads; i++ {
+		go worker(bufferChannels[i], jobChannels[i])
+		jobChannels[i] <- jobIndex
+		jobIndex++
+	}
+
+	for {
+		for i := 0; i < nThreads; i++ {
+			os.Stdout.Write(<-bufferChannels[i])
+			jobChannels[i] <- jobIndex
+			jobIndex++
+		}
+	}
 }
