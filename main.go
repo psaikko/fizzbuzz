@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"fizzbuzz/bufferedwriter"
 	"fmt"
 	"os"
 	"runtime"
@@ -22,7 +23,7 @@ func main() {
 		"withBufio":                withBufio,
 		"withTemplateBufio":        withTemplateBufio,
 		"writeBytes":               writeBytes,
-		"writeByteBuffers":         writeByteBuffers,
+		"BufferedWriter":           bufferedwriter.FizzBuzz,
 		"writeTemplateByteBuffers": writeTemplateByteBuffers,
 		"parallelTemplateBuffers":  parallelTemplateBuffers,
 	}
@@ -50,7 +51,7 @@ func baseline(from, to int) {
 	}
 }
 
-const templateSize = 15
+const templateLines = 15
 const templateString = `%d
 %d
 Fizz
@@ -70,7 +71,7 @@ FizzBuzz
 
 // ~116 MiB/s
 func withTemplate(from, to int) {
-	for i := from; i < to; i += templateSize {
+	for i := from; i < to; i += templateLines {
 		fmt.Printf(templateString, i+1, i+2, i+4, i+7, i+8, i+11, i+13, i+14)
 	}
 }
@@ -95,7 +96,7 @@ func withBufio(from, to int) {
 // ~156 MiB/s
 func withTemplateBufio(from, to int) {
 	b := bufio.NewWriter(os.Stdout)
-	for i := from; i < to; i += templateSize {
+	for i := from; i < to; i += templateLines {
 		b.WriteString(fmt.Sprintf(templateString, i+1, i+2, i+4, i+7, i+8, i+11, i+13, i+14))
 	}
 }
@@ -120,52 +121,6 @@ func writeBytes(from, to int) {
 	}
 }
 
-// bufsize = 64:    ~81 MiB/s
-// bufsize = 128:   110
-// bufsize = 256:   151
-// bufsize = 512:   119
-// bufsize = 1024:  118
-// bufsize = 2048:  121
-// bufsize = 4096:  155
-// bufsize = 8192:  182
-// bufsize = 16384: 200
-// bufsize = 32768: 208
-// bufsize = 65536: 215
-func writeByteBuffers(from, to int) {
-	fizzBuzzBytes := []byte("FizzBuzz\n")
-	fizzBytes := []byte("Fizz\n")
-	buzzBytes := []byte("Buzz\n")
-
-	f := os.Stdout
-
-	const bufSize = 65536
-	bufPtr := 0
-	buffer := make([]byte, bufSize)
-
-	for i := from; i < to; i++ {
-		var bytes []byte
-		if (i%3 == 0) && (i%5 == 0) {
-			bytes = fizzBuzzBytes
-		} else if i%3 == 0 {
-			bytes = fizzBytes
-		} else if i%5 == 0 {
-			bytes = buzzBytes
-		} else {
-			bytes = []byte(strconv.Itoa(i) + "\n")
-		}
-
-		if bufPtr+len(bytes) >= bufSize {
-			f.Write(buffer[:bufPtr])
-			bufPtr = 0
-		}
-
-		copy(buffer[bufPtr:], bytes)
-		bufPtr += len(bytes)
-	}
-
-	f.Write(buffer[:bufPtr])
-}
-
 // ~208 MiB/s
 func writeTemplateByteBuffers(from, to int) {
 	f := os.Stdout
@@ -174,7 +129,7 @@ func writeTemplateByteBuffers(from, to int) {
 	bufPtr := 0
 	buffer := make([]byte, bufSize)
 
-	for i := from; i < to; i += templateSize {
+	for i := from; i < to; i += templateLines {
 		bytes := []byte(fmt.Sprintf(templateString, i+1, i+2, i+4, i+7, i+8, i+11, i+13, i+14))
 
 		if bufPtr+len(bytes) >= bufSize {
@@ -192,7 +147,7 @@ func writeTemplateByteBuffers(from, to int) {
 const jobSize = 10000
 
 func worker(out chan<- []byte, in <-chan int) {
-	linesPerJob := jobSize * templateSize
+	linesPerJob := jobSize * templateLines
 	buffer := make([]byte, 0, linesPerJob)
 	swapBuffer := make([]byte, 0, linesPerJob)
 
@@ -201,7 +156,7 @@ func worker(out chan<- []byte, in <-chan int) {
 		start := jobIndex * linesPerJob
 		end := (jobIndex + 1) * linesPerJob
 
-		for i := start; i < end; i += templateSize {
+		for i := start; i < end; i += templateLines {
 			bytes := []byte(fmt.Sprintf(templateString, i+1, i+2, i+4, i+7, i+8, i+11, i+13, i+14))
 			buffer = append(buffer, bytes...)
 		}
@@ -224,7 +179,7 @@ func parallelTemplateBuffers(_, to int) {
 	}
 
 	jobIndex := 0
-	linesPerJob := jobSize * templateSize
+	linesPerJob := jobSize * templateLines
 
 	for i := 0; i < nThreads; i++ {
 		go worker(bufferChannels[i], jobChannels[i])
