@@ -2,14 +2,16 @@ package main
 
 import (
 	"bufio"
+	"fizzbuzz/baseline"
 	"fizzbuzz/bufferedwriter"
+	"fizzbuzz/fixedwidth"
 	"fmt"
 	"os"
 	"runtime"
 	"strconv"
 )
 
-const limit = 1 << 32
+const limit = 1 << 62
 
 func main() {
 
@@ -18,14 +20,15 @@ func main() {
 	}
 
 	strategies := map[string]func(int, int){
-		"baseline":                 baseline,
-		"withTemplate":             withTemplate,
-		"withBufio":                withBufio,
-		"withTemplateBufio":        withTemplateBufio,
-		"writeBytes":               writeBytes,
-		"BufferedWriter":           bufferedwriter.FizzBuzz,
-		"writeTemplateByteBuffers": writeTemplateByteBuffers,
-		"parallelTemplateBuffers":  parallelTemplateBuffers,
+		"baseline":                baseline.FizzBuzz,
+		"withTemplate":            withTemplate,
+		"withBufio":               withBufio,
+		"withTemplateBufio":       withTemplateBufio,
+		"writeBytes":              writeBytes,
+		"BufferedWriter":          bufferedwriter.FizzBuzz,
+		"templateBufferedWriter":  templateBufferedWriter,
+		"parallelTemplateBuffers": parallelTemplateBuffers,
+		"FixedWidth":              fixedwidth.FizzBuzz,
 	}
 
 	if f, ok := strategies[os.Args[1]]; ok {
@@ -34,21 +37,6 @@ func main() {
 		fmt.Println("Strategy", os.Args[1], "not defined")
 	}
 
-}
-
-// ~20 MiB/s
-func baseline(from, to int) {
-	for i := from; i < to; i++ {
-		if (i%3 == 0) && (i%5 == 0) {
-			fmt.Println("FizzBuzz")
-		} else if i%3 == 0 {
-			fmt.Println("Fizz")
-		} else if i%5 == 0 {
-			fmt.Println("Buzz")
-		} else {
-			fmt.Printf("%d\n", i)
-		}
-	}
 }
 
 const templateLines = 15
@@ -122,26 +110,16 @@ func writeBytes(from, to int) {
 }
 
 // ~208 MiB/s
-func writeTemplateByteBuffers(from, to int) {
-	f := os.Stdout
-
+func templateBufferedWriter(from, to int) {
 	const bufSize = 65536
-	bufPtr := 0
-	buffer := make([]byte, bufSize)
+	bw := bufferedwriter.New(os.Stdout, bufSize)
 
 	for i := from; i < to; i += templateLines {
 		bytes := []byte(fmt.Sprintf(templateString, i+1, i+2, i+4, i+7, i+8, i+11, i+13, i+14))
-
-		if bufPtr+len(bytes) >= bufSize {
-			f.Write(buffer[:bufPtr])
-			bufPtr = 0
-		}
-
-		copy(buffer[bufPtr:], bytes)
-		bufPtr += len(bytes)
+		bw.Write(bytes)
 	}
 
-	f.Write(buffer[:bufPtr])
+	bw.Flush()
 }
 
 const jobSize = 10000
