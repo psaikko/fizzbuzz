@@ -7,11 +7,11 @@ import (
 
 func FizzBuzzLine(i int) string {
 	if (i%3 == 0) && (i%5 == 0) {
-		return "FizzBuzz"
+		return "FizzBuzz\n"
 	} else if i%3 == 0 {
-		return "Fizz"
+		return "Fizz\n"
 	} else if i%5 == 0 {
-		return "Buzz"
+		return "Buzz\n"
 	} else {
 		return strconv.Itoa(i) + "\n"
 	}
@@ -19,6 +19,6 @@ func FizzBuzzLine(i int) string {
 
 func FizzBuzz(from, to int) {
 	for i := from; i < to; i++ {
-		fmt.Println(FizzBuzzLine(i))
+		fmt.Print(FizzBuzzLine(i))
 	}
 }
