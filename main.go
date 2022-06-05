@@ -11,7 +11,7 @@ import (
 	"strconv"
 )
 
-const limit = 1 << 62
+const limit = 1 << 61
 
 func main() {
 
@@ -32,7 +32,7 @@ func main() {
 	}
 
 	if f, ok := strategies[os.Args[1]]; ok {
-		f(0, limit)
+		f(1, limit)
 	} else {
 		fmt.Println("Strategy", os.Args[1], "not defined")
 	}
