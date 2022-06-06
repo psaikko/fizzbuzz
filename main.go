@@ -11,7 +11,7 @@ import (
 	"strconv"
 )
 
-const limit = 1 << 61
+const limit = 10101
 
 func main() {
 
@@ -29,6 +29,7 @@ func main() {
 		"templateBufferedWriter":  templateBufferedWriter,
 		"parallelTemplateBuffers": parallelTemplateBuffers,
 		"FixedWidth":              fixedwidth.FizzBuzz,
+		"ParallelFixedWidth":      fixedwidth.ParallelFizzBuzz,
 	}
 
 	if f, ok := strategies[os.Args[1]]; ok {
