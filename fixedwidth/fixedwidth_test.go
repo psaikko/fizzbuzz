@@ -23,7 +23,15 @@ func BenchmarkFizzBuzz10M(b *testing.B) {
 	}
 }
 
-func TestFixedWidth(t *testing.T) {
+func BenchmarkFizzBuzz1G(b *testing.B) {
+	devnull, _ := os.Open("/dev/null")
+	os.Stdout = devnull
+	for i := 0; i < b.N; i++ {
+		FizzBuzz(100000000, 1000000000)
+	}
+}
+
+func TestFixedWidthSmall(t *testing.T) {
 	const testLines = 10101
 
 	r1, w1, _ := os.Pipe()
