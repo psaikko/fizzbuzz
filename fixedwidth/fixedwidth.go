@@ -61,6 +61,7 @@ func initItoaCache() {
 
 type widthRange struct{ from, to, width int }
 
+// getWidthRanges splits integer range [from,to] into disjoint ranges grouped by base10 representation length
 func getWidthRanges(from, to int) []widthRange {
 	ranges := []widthRange{}
 
@@ -86,11 +87,11 @@ func FizzBuzz(from, to int) {
 
 	for _, wr := range getWidthRanges(from, to) {
 		// range which can be filled with templates
-		templatesStart := ((wr.from + templateLines - 1) / templateLines) * templateLines
-		templatesEnd := (wr.to / templateLines) * templateLines
+		templatesStart := ints.Min(wr.to, ints.CeilDiv(wr.from, templateLines)*templateLines)
+		templatesEnd := templatesStart + ints.FloorDiv(wr.to-templatesStart+1, templateLines)*templateLines
 
 		// handle values before first template
-		for i := wr.from; i <= ints.Min(templatesStart, wr.to); i++ {
+		for i := wr.from; i <= templatesStart; i++ {
 			bw.Write([]byte(baseline.FizzBuzzLine(i)))
 		}
 
@@ -127,7 +128,7 @@ func FizzBuzz(from, to int) {
 		}
 
 		// handle values after last template
-		for i := ints.Max(templatesStart, templatesEnd+1); i <= wr.to; i++ {
+		for i := templatesEnd + 1; i <= wr.to; i++ {
 			bw.Write([]byte(baseline.FizzBuzzLine(i)))
 		}
 	}
@@ -224,26 +225,25 @@ func ParallelFizzBuzz(from, to int) {
 
 	for _, wr := range getWidthRanges(from, to) {
 		// range which can be filled with templates
-		templatesStart := ((wr.from+templateLines-1)/templateLines)*templateLines + 1
-		templatesEnd := (wr.to / templateLines) * templateLines
-		nTemplatedLines := templatesEnd - templatesStart + 1
+		templatesStart := ints.Min(wr.to, ints.CeilDiv(wr.from, templateLines)*templateLines)
+		templatesEnd := templatesStart + ints.FloorDiv(wr.to-templatesStart+1, templateLines)*templateLines
 
 		// handle values before first template
-		for i := wr.from; i < ints.Min(templatesStart, wr.to+1); i++ {
+		for i := wr.from; i <= templatesStart; i++ {
 			os.Stdout.WriteString(baseline.FizzBuzzLine(i))
 		}
 
 		// write large chunks in parallel
-		const templatesPerJob = 10000
+		const templatesPerJob = 100
 		template, placeholderIdxs := fixedWidthTemplate(wr.width)
-		nWorkers := 6 // runtime.NumCPU()
+		nWorkers := 2 // runtime.NumCPU()
 		chunkSize := nWorkers * templateLines * templatesPerJob
 
 		chunksStart := templatesStart
-		chunksEnd := chunksStart + (nTemplatedLines/chunkSize)*chunkSize - 1
+		chunksEnd := chunksStart + ints.FloorDiv(templatesEnd-templatesStart+1, chunkSize)*chunkSize
 
 		if chunksEnd > templatesStart {
-			writeParallel(os.Stdout, chunksStart, chunksEnd, nWorkers, templatesPerJob, template, wr.width, placeholderIdxs)
+			writeParallel(os.Stdout, chunksStart+1, chunksEnd, nWorkers, templatesPerJob, template, wr.width, placeholderIdxs)
 		}
 
 		// handle values after last chunk
