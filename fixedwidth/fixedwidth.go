@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"runtime"
 )
 
 const templateLines = 15
@@ -47,22 +46,28 @@ func fixedWidthTemplate(valueWidth int) ([]byte, []int) {
 	return template, placeholderIdxs
 }
 
+const cacheSize = 10000
+
+var logCacheSize = ints.Log10(cacheSize)
+var itoaCache = make([]string, cacheSize)
+
+func initItoaCache() {
+	// precompute string representations
+	fmtString := fmt.Sprintf("%%0%dd", logCacheSize)
+	for j := 0; j < cacheSize; j++ {
+		itoaCache[j] = fmt.Sprintf(fmtString, j)
+	}
+}
+
 func FizzBuzz(from, to int) {
+	initItoaCache()
+
 	const bufferSize = 65536
 	bw := bufio.NewWriterSize(os.Stdout, bufferSize)
 
 	rangeStart := from
 	rangeEnd := ints.Pow(10, ints.Log10(rangeStart)+1) - 1
 	rangeEnd = ints.Min(rangeEnd, to)
-
-	const cacheSize = 10000
-	logCacheSize := ints.Log10(cacheSize)
-	itoaCache := make([]string, cacheSize)
-	// precompute string representations
-	fmtString := fmt.Sprintf("%%0%dd", logCacheSize)
-	for j := 0; j < cacheSize; j++ {
-		itoaCache[j] = fmt.Sprintf(fmtString, j)
-	}
 
 	for width := ints.Log10(from + 1); ; width++ {
 		// range which can be filled with templates
@@ -122,7 +127,7 @@ func FizzBuzz(from, to int) {
 	bw.Flush()
 }
 
-func worker(in <-chan int, out chan<- []byte, templatesPerJob int, template []byte, placeholderIdxs []int) {
+func worker(in <-chan int, out chan<- []byte, templatesPerJob int, template []byte, width int, idxs []int) {
 	buffer := make([]byte, len(template)*templatesPerJob)
 	swapBuffer := make([]byte, len(template)*templatesPerJob)
 
@@ -132,16 +137,32 @@ func worker(in <-chan int, out chan<- []byte, templatesPerJob int, template []by
 	copy(swapBuffer, buffer)
 
 	for jobLine := range in {
+
+		nextFlush := (jobLine / cacheSize) * cacheSize
+
 		for i := 0; i < templatesPerJob; i++ {
-			posOffset := i * len(template)
-			copy(buffer[posOffset+placeholderIdxs[0]:], ints.FastItoa(uint64(jobLine+15*i)))
-			copy(buffer[posOffset+placeholderIdxs[1]:], ints.FastItoa(uint64(jobLine+15*i+1)))
-			copy(buffer[posOffset+placeholderIdxs[2]:], ints.FastItoa(uint64(jobLine+15*i+3)))
-			copy(buffer[posOffset+placeholderIdxs[3]:], ints.FastItoa(uint64(jobLine+15*i+6)))
-			copy(buffer[posOffset+placeholderIdxs[4]:], ints.FastItoa(uint64(jobLine+15*i+7)))
-			copy(buffer[posOffset+placeholderIdxs[5]:], ints.FastItoa(uint64(jobLine+15*i+10)))
-			copy(buffer[posOffset+placeholderIdxs[6]:], ints.FastItoa(uint64(jobLine+15*i+12)))
-			copy(buffer[posOffset+placeholderIdxs[7]:], ints.FastItoa(uint64(jobLine+15*i+13)))
+			off := i * len(template)
+			if off+jobLine+13 > nextFlush {
+				copy(buffer[off+idxs[0]:], ints.FastItoa(uint64(i*templateLines+jobLine)))
+				copy(buffer[off+idxs[1]:], ints.FastItoa(uint64(i*templateLines+jobLine+1)))
+				copy(buffer[off+idxs[2]:], ints.FastItoa(uint64(i*templateLines+jobLine+3)))
+				copy(buffer[off+idxs[3]:], ints.FastItoa(uint64(i*templateLines+jobLine+6)))
+				copy(buffer[off+idxs[4]:], ints.FastItoa(uint64(i*templateLines+jobLine+7)))
+				copy(buffer[off+idxs[5]:], ints.FastItoa(uint64(i*templateLines+jobLine+10)))
+				copy(buffer[off+idxs[6]:], ints.FastItoa(uint64(i*templateLines+jobLine+12)))
+				copy(buffer[off+idxs[7]:], ints.FastItoa(uint64(i*templateLines+jobLine+13)))
+				nextFlush += cacheSize
+			} else {
+				copy(buffer[off:], buffer[off-len(template):off])
+				copy(buffer[off+idxs[0]+width-logCacheSize:], itoaCache[(i*templateLines+jobLine)%cacheSize])
+				copy(buffer[off+idxs[1]+width-logCacheSize:], itoaCache[(i*templateLines+jobLine+1)%cacheSize])
+				copy(buffer[off+idxs[2]+width-logCacheSize:], itoaCache[(i*templateLines+jobLine+3)%cacheSize])
+				copy(buffer[off+idxs[3]+width-logCacheSize:], itoaCache[(i*templateLines+jobLine+6)%cacheSize])
+				copy(buffer[off+idxs[4]+width-logCacheSize:], itoaCache[(i*templateLines+jobLine+7)%cacheSize])
+				copy(buffer[off+idxs[5]+width-logCacheSize:], itoaCache[(i*templateLines+jobLine+10)%cacheSize])
+				copy(buffer[off+idxs[6]+width-logCacheSize:], itoaCache[(i*templateLines+jobLine+12)%cacheSize])
+				copy(buffer[off+idxs[7]+width-logCacheSize:], itoaCache[(i*templateLines+jobLine+13)%cacheSize])
+			}
 		}
 
 		out <- buffer
@@ -151,7 +172,7 @@ func worker(in <-chan int, out chan<- []byte, templatesPerJob int, template []by
 	close(out)
 }
 
-func writeParallel(f io.Writer, firstLine, lastLine, nWorkers, templatesPerJob int, template []byte, placeholderIdxs []int) {
+func writeParallel(f io.Writer, firstLine, lastLine, nWorkers, templatesPerJob int, template []byte, width int, placeholderIdxs []int) {
 
 	totalLines := lastLine - firstLine + 1
 	workerLines := templateLines * templatesPerJob
@@ -168,7 +189,7 @@ func writeParallel(f io.Writer, firstLine, lastLine, nWorkers, templatesPerJob i
 	for i := 0; i < nWorkers; i++ {
 		jobChan := make(chan int)
 		resultChan := make(chan []byte)
-		go worker(jobChan, resultChan, templatesPerJob, template, placeholderIdxs)
+		go worker(jobChan, resultChan, templatesPerJob, template, width, placeholderIdxs)
 		jobChannels = append(jobChannels, jobChan)
 		resultChannels = append(resultChannels, resultChan)
 		jobChan <- workersPos
@@ -191,14 +212,13 @@ func writeParallel(f io.Writer, firstLine, lastLine, nWorkers, templatesPerJob i
 }
 
 func ParallelFizzBuzz(from, to int) {
-
-	f := os.Stdout
+	initItoaCache()
 
 	rangeStart := from
 	rangeEnd := ints.Pow(10, ints.Log10(rangeStart)+1) - 1
 	rangeEnd = ints.Min(rangeEnd, to)
 
-	for width := 1; ; width++ {
+	for width := ints.Log10(from + 1); ; width++ {
 		// range which can be filled with templates
 		templatesStart := ((rangeStart+templateLines-1)/templateLines)*templateLines + 1
 		templatesEnd := (rangeEnd / templateLines) * templateLines
@@ -206,23 +226,25 @@ func ParallelFizzBuzz(from, to int) {
 
 		// handle values before first template
 		for i := rangeStart; i < ints.Min(templatesStart, rangeEnd+1); i++ {
-			f.WriteString(baseline.FizzBuzzLine(i))
+			os.Stdout.WriteString(baseline.FizzBuzzLine(i))
 		}
 
 		// write large chunks in parallel
 		const templatesPerJob = 10000
 		template, placeholderIdxs := fixedWidthTemplate(width)
-		nWorkers := runtime.NumCPU()
+		nWorkers := 6 // runtime.NumCPU()
 		chunkSize := nWorkers * templateLines * templatesPerJob
-		chunksEnd := templatesStart + (nTemplatedLines/chunkSize)*chunkSize - 1
+
+		chunksStart := templatesStart
+		chunksEnd := chunksStart + (nTemplatedLines/chunkSize)*chunkSize - 1
 
 		if chunksEnd > templatesStart {
-			writeParallel(f, templatesStart, chunksEnd, nWorkers, templatesPerJob, template, placeholderIdxs)
+			writeParallel(os.Stdout, chunksStart, chunksEnd, nWorkers, templatesPerJob, template, width, placeholderIdxs)
 		}
 
 		// handle values after last chunk
 		for i := chunksEnd + 1; i <= rangeEnd; i++ {
-			f.WriteString(baseline.FizzBuzzLine(i))
+			os.Stdout.WriteString(baseline.FizzBuzzLine(i))
 		}
 
 		// update ranges
