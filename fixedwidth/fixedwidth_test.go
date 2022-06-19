@@ -84,3 +84,29 @@ func TestParallelSmall(t *testing.T) {
 		}
 	}
 }
+
+func TestWidthRanges(t *testing.T) {
+	cases := []struct {
+		from, to int
+		expected []widthRange
+	}{
+		{1, 5, []widthRange{{1, 5, 1}}},
+		{1, 10, []widthRange{{1, 9, 1}, {10, 10, 2}}},
+		{57, 1010, []widthRange{{57, 99, 2}, {100, 999, 3}, {1000, 1010, 4}}},
+		{9, 10, []widthRange{{9, 9, 1}, {10, 10, 2}}},
+	}
+
+	for _, tc := range cases {
+		res := getWidthRanges(tc.from, tc.to)
+
+		if len(res) != len(tc.expected) {
+			t.Fatalf("Incorrect number of ranges %d != expected %d", len(res), len(tc.expected))
+		}
+
+		for i := range res {
+			if res[i].from != tc.expected[i].from || res[i].to != tc.expected[i].to {
+				t.Fatalf("Incorrect range %v != expected %v", res[i], tc.expected[i])
+			}
+		}
+	}
+}

@@ -59,68 +59,76 @@ func initItoaCache() {
 	}
 }
 
+type widthRange struct{ from, to, width int }
+
+func getWidthRanges(from, to int) []widthRange {
+	ranges := []widthRange{}
+
+	fromWidth := ints.Log10(from + 1)
+	toWidth := ints.Log10(to + 1)
+
+	for fromWidth < toWidth {
+		toVal := ints.Pow(10, fromWidth) - 1
+		ranges = append(ranges, widthRange{from, toVal, fromWidth})
+		from = toVal + 1
+		fromWidth += 1
+	}
+
+	ranges = append(ranges, widthRange{from, to, fromWidth})
+	return ranges
+}
+
 func FizzBuzz(from, to int) {
 	initItoaCache()
 
 	const bufferSize = 65536
 	bw := bufio.NewWriterSize(os.Stdout, bufferSize)
 
-	rangeStart := from
-	rangeEnd := ints.Pow(10, ints.Log10(rangeStart)+1) - 1
-	rangeEnd = ints.Min(rangeEnd, to)
-
-	for width := ints.Log10(from + 1); ; width++ {
+	for _, wr := range getWidthRanges(from, to) {
 		// range which can be filled with templates
-		templatesStart := ((rangeStart + templateLines - 1) / templateLines) * templateLines
-		templatesEnd := (rangeEnd / templateLines) * templateLines
+		templatesStart := ((wr.from + templateLines - 1) / templateLines) * templateLines
+		templatesEnd := (wr.to / templateLines) * templateLines
 
 		// handle values before first template
-		for i := rangeStart; i <= ints.Min(templatesStart, rangeEnd); i++ {
+		for i := wr.from; i <= ints.Min(templatesStart, wr.to); i++ {
 			bw.Write([]byte(baseline.FizzBuzzLine(i)))
 		}
 
 		// print templates
-		template, idxs := fixedWidthTemplate(width)
+		template, idxs := fixedWidthTemplate(wr.width)
 		nextFlush := templatesStart
 
 		for i := templatesStart; i < templatesEnd; i += templateLines {
 
-			if i+14 > nextFlush || logCacheSize >= width {
+			if i+14 > nextFlush || logCacheSize >= wr.width {
 				// every $logCacheSize lines, write the entire buffer
-				ints.CopyItoa(template, idxs[0]+width, uint64(i+1))
-				ints.CopyItoa(template, idxs[1]+width, uint64(i+2))
-				ints.CopyItoa(template, idxs[2]+width, uint64(i+4))
-				ints.CopyItoa(template, idxs[3]+width, uint64(i+7))
-				ints.CopyItoa(template, idxs[4]+width, uint64(i+8))
-				ints.CopyItoa(template, idxs[5]+width, uint64(i+11))
-				ints.CopyItoa(template, idxs[6]+width, uint64(i+13))
-				ints.CopyItoa(template, idxs[7]+width, uint64(i+14))
+				ints.CopyItoa(template, idxs[0]+wr.width, uint64(i+1))
+				ints.CopyItoa(template, idxs[1]+wr.width, uint64(i+2))
+				ints.CopyItoa(template, idxs[2]+wr.width, uint64(i+4))
+				ints.CopyItoa(template, idxs[3]+wr.width, uint64(i+7))
+				ints.CopyItoa(template, idxs[4]+wr.width, uint64(i+8))
+				ints.CopyItoa(template, idxs[5]+wr.width, uint64(i+11))
+				ints.CopyItoa(template, idxs[6]+wr.width, uint64(i+13))
+				ints.CopyItoa(template, idxs[7]+wr.width, uint64(i+14))
 
 				nextFlush += cacheSize
 			} else {
 				// write only the last $logCacheSize digits, others unchanged
-				copy(template[idxs[0]+width-logCacheSize:], itoaCache[(i+1)%cacheSize])
-				copy(template[idxs[1]+width-logCacheSize:], itoaCache[(i+2)%cacheSize])
-				copy(template[idxs[2]+width-logCacheSize:], itoaCache[(i+4)%cacheSize])
-				copy(template[idxs[3]+width-logCacheSize:], itoaCache[(i+7)%cacheSize])
-				copy(template[idxs[4]+width-logCacheSize:], itoaCache[(i+8)%cacheSize])
-				copy(template[idxs[5]+width-logCacheSize:], itoaCache[(i+11)%cacheSize])
-				copy(template[idxs[6]+width-logCacheSize:], itoaCache[(i+13)%cacheSize])
-				copy(template[idxs[7]+width-logCacheSize:], itoaCache[(i+14)%cacheSize])
+				copy(template[idxs[0]+wr.width-logCacheSize:], itoaCache[(i+1)%cacheSize])
+				copy(template[idxs[1]+wr.width-logCacheSize:], itoaCache[(i+2)%cacheSize])
+				copy(template[idxs[2]+wr.width-logCacheSize:], itoaCache[(i+4)%cacheSize])
+				copy(template[idxs[3]+wr.width-logCacheSize:], itoaCache[(i+7)%cacheSize])
+				copy(template[idxs[4]+wr.width-logCacheSize:], itoaCache[(i+8)%cacheSize])
+				copy(template[idxs[5]+wr.width-logCacheSize:], itoaCache[(i+11)%cacheSize])
+				copy(template[idxs[6]+wr.width-logCacheSize:], itoaCache[(i+13)%cacheSize])
+				copy(template[idxs[7]+wr.width-logCacheSize:], itoaCache[(i+14)%cacheSize])
 			}
 			bw.Write(template)
 		}
 
 		// handle values after last template
-		for i := ints.Max(templatesStart, templatesEnd+1); i <= rangeEnd; i++ {
+		for i := ints.Max(templatesStart, templatesEnd+1); i <= wr.to; i++ {
 			bw.Write([]byte(baseline.FizzBuzzLine(i)))
-		}
-
-		// update ranges
-		rangeStart *= 10
-		rangeEnd = ints.Min(rangeStart*10-1, to)
-		if rangeStart > rangeEnd {
-			break
 		}
 	}
 
@@ -214,24 +222,20 @@ func writeParallel(f io.Writer, firstLine, lastLine, nWorkers, templatesPerJob i
 func ParallelFizzBuzz(from, to int) {
 	initItoaCache()
 
-	rangeStart := from
-	rangeEnd := ints.Pow(10, ints.Log10(rangeStart)+1) - 1
-	rangeEnd = ints.Min(rangeEnd, to)
-
-	for width := ints.Log10(from + 1); ; width++ {
+	for _, wr := range getWidthRanges(from, to) {
 		// range which can be filled with templates
-		templatesStart := ((rangeStart+templateLines-1)/templateLines)*templateLines + 1
-		templatesEnd := (rangeEnd / templateLines) * templateLines
+		templatesStart := ((wr.from+templateLines-1)/templateLines)*templateLines + 1
+		templatesEnd := (wr.to / templateLines) * templateLines
 		nTemplatedLines := templatesEnd - templatesStart + 1
 
 		// handle values before first template
-		for i := rangeStart; i < ints.Min(templatesStart, rangeEnd+1); i++ {
+		for i := wr.from; i < ints.Min(templatesStart, wr.to+1); i++ {
 			os.Stdout.WriteString(baseline.FizzBuzzLine(i))
 		}
 
 		// write large chunks in parallel
 		const templatesPerJob = 10000
-		template, placeholderIdxs := fixedWidthTemplate(width)
+		template, placeholderIdxs := fixedWidthTemplate(wr.width)
 		nWorkers := 6 // runtime.NumCPU()
 		chunkSize := nWorkers * templateLines * templatesPerJob
 
@@ -239,19 +243,12 @@ func ParallelFizzBuzz(from, to int) {
 		chunksEnd := chunksStart + (nTemplatedLines/chunkSize)*chunkSize - 1
 
 		if chunksEnd > templatesStart {
-			writeParallel(os.Stdout, chunksStart, chunksEnd, nWorkers, templatesPerJob, template, width, placeholderIdxs)
+			writeParallel(os.Stdout, chunksStart, chunksEnd, nWorkers, templatesPerJob, template, wr.width, placeholderIdxs)
 		}
 
 		// handle values after last chunk
-		for i := chunksEnd + 1; i <= rangeEnd; i++ {
+		for i := chunksEnd + 1; i <= wr.to; i++ {
 			os.Stdout.WriteString(baseline.FizzBuzzLine(i))
-		}
-
-		// update ranges
-		rangeStart *= 10
-		rangeEnd = ints.Min(rangeStart*10-1, to)
-		if rangeStart > rangeEnd {
-			break
 		}
 	}
 }
