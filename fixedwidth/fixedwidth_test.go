@@ -54,10 +54,14 @@ func TestFixedWidthSmall(t *testing.T) {
 	br2 := bufio.NewReader(r2)
 
 	for i := 1; i < testLines; i++ {
-		s1, _ := br1.ReadString('\n')
-		s2, _ := br2.ReadString('\n')
+		s1, err1 := br1.ReadString('\n')
+		s2, err2 := br2.ReadString('\n')
+		if err1 != nil || err2 != nil {
+			t.Fatalf("Errors %e, %e", err1, err2)
+		}
+
 		if s1 != s2 {
-			t.Errorf("Output '%s' did not match reference implementation '%s'", s1, s2)
+			t.Fatalf("Output '%s' did not match reference implementation '%s'", s1, s2)
 		}
 	}
 }
@@ -77,10 +81,14 @@ func TestParallelSmall(t *testing.T) {
 	br2 := bufio.NewReader(r2)
 
 	for i := 1; i < testLines; i++ {
-		s1, _ := br1.ReadString('\n')
-		s2, _ := br2.ReadString('\n')
+		s1, err1 := br1.ReadString('\n')
+		s2, err2 := br2.ReadString('\n')
+		if err1 != nil || err2 != nil {
+			t.Fatalf("Errors %e, %e", err1, err2)
+		}
+
 		if s1 != s2 {
-			t.Errorf("Output '%s' did not match reference implementation '%s'", s1, s2)
+			t.Fatalf("Output '%s' did not match reference implementation '%s'", s1, s2)
 		}
 	}
 }
