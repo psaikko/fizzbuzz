@@ -8,7 +8,6 @@ import (
 	"io"
 	"os"
 	"runtime"
-	"strconv"
 )
 
 const templateLines = 15
@@ -49,19 +48,20 @@ func fixedWidthTemplate(valueWidth int) ([]byte, []int) {
 }
 
 func FizzBuzz(from, to int) {
-
-	bw := bufio.NewWriterSize(os.Stdout, 65536)
+	const bufferSize = 65536
+	bw := bufio.NewWriterSize(os.Stdout, bufferSize)
 
 	rangeStart := from
 	rangeEnd := ints.Pow(10, ints.Log10(rangeStart)+1) - 1
 	rangeEnd = ints.Min(rangeEnd, to)
 
-	cacheSize := 10000
+	const cacheSize = 10000
 	logCacheSize := ints.Log10(cacheSize)
 	itoaCache := make([]string, cacheSize)
 	// precompute string representations
+	fmtString := fmt.Sprintf("%%0%dd", logCacheSize)
 	for j := 0; j < cacheSize; j++ {
-		itoaCache[j] = fmt.Sprintf("%0"+strconv.Itoa(logCacheSize)+"d", j)
+		itoaCache[j] = fmt.Sprintf(fmtString, j)
 	}
 
 	for width := ints.Log10(from + 1); ; width++ {
@@ -134,14 +134,14 @@ func worker(in <-chan int, out chan<- []byte, templatesPerJob int, template []by
 	for jobLine := range in {
 		for i := 0; i < templatesPerJob; i++ {
 			posOffset := i * len(template)
-			copy(buffer[posOffset+placeholderIdxs[0]:], strconv.Itoa(jobLine+15*i))
-			copy(buffer[posOffset+placeholderIdxs[1]:], strconv.Itoa(jobLine+15*i+1))
-			copy(buffer[posOffset+placeholderIdxs[2]:], strconv.Itoa(jobLine+15*i+3))
-			copy(buffer[posOffset+placeholderIdxs[3]:], strconv.Itoa(jobLine+15*i+6))
-			copy(buffer[posOffset+placeholderIdxs[4]:], strconv.Itoa(jobLine+15*i+7))
-			copy(buffer[posOffset+placeholderIdxs[5]:], strconv.Itoa(jobLine+15*i+10))
-			copy(buffer[posOffset+placeholderIdxs[6]:], strconv.Itoa(jobLine+15*i+12))
-			copy(buffer[posOffset+placeholderIdxs[7]:], strconv.Itoa(jobLine+15*i+13))
+			copy(buffer[posOffset+placeholderIdxs[0]:], ints.FastItoa(uint64(jobLine+15*i)))
+			copy(buffer[posOffset+placeholderIdxs[1]:], ints.FastItoa(uint64(jobLine+15*i+1)))
+			copy(buffer[posOffset+placeholderIdxs[2]:], ints.FastItoa(uint64(jobLine+15*i+3)))
+			copy(buffer[posOffset+placeholderIdxs[3]:], ints.FastItoa(uint64(jobLine+15*i+6)))
+			copy(buffer[posOffset+placeholderIdxs[4]:], ints.FastItoa(uint64(jobLine+15*i+7)))
+			copy(buffer[posOffset+placeholderIdxs[5]:], ints.FastItoa(uint64(jobLine+15*i+10)))
+			copy(buffer[posOffset+placeholderIdxs[6]:], ints.FastItoa(uint64(jobLine+15*i+12)))
+			copy(buffer[posOffset+placeholderIdxs[7]:], ints.FastItoa(uint64(jobLine+15*i+13)))
 		}
 
 		out <- buffer

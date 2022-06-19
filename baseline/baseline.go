@@ -2,9 +2,9 @@ package baseline
 
 import (
 	"bufio"
+	"fizzbuzz/ints"
 	"fmt"
 	"os"
-	"strconv"
 )
 
 func FizzBuzzLine(i int) string {
@@ -15,7 +15,7 @@ func FizzBuzzLine(i int) string {
 	} else if i%5 == 0 {
 		return "Buzz\n"
 	} else {
-		return strconv.Itoa(i) + "\n"
+		return ints.FastItoa(uint64(i)) + "\n"
 	}
 }
 

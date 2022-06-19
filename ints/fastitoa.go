@@ -1,6 +1,6 @@
 // This implementation adapted from Go source strconv/itoa.go:
 
-// Copyright 2009 The Go Authors. All rights reserved.
+// Parts Copyright 2009 The Go Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
@@ -17,7 +17,7 @@ const smallsString = "00010203040506070809" +
 	"80818283848586878889" +
 	"90919293949596979899"
 
-// CopyItoa converts a positive integer to base10 string
+// CopyItoa writes base10 string representation of a positive integer to index i in dst
 //
 // adapted from Go source function formatBits
 //
@@ -39,4 +39,33 @@ func CopyItoa(dst []byte, i int, u uint64) {
 		i--
 		dst[i] = smallsString[is]
 	}
+}
+
+// FastItoa returns base10 string representation of a positive integer
+//
+// adapted from Go source function formatBits
+//
+func FastItoa(u uint64) string {
+
+	var dst [20]byte
+	i := len(dst)
+
+	for u >= 100 {
+		is := u % 100 * 2
+		u /= 100
+		i -= 2
+		dst[i+1] = smallsString[is+1]
+		dst[i+0] = smallsString[is+0]
+	}
+
+	// u < 100
+	is := u * 2
+	i--
+	dst[i] = smallsString[is+1]
+	if u >= 10 {
+		i--
+		dst[i] = smallsString[is]
+	}
+
+	return string(dst[i:])
 }
