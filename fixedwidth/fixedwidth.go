@@ -1,8 +1,8 @@
 package fixedwidth
 
 import (
+	"bufio"
 	"fizzbuzz/baseline"
-	"fizzbuzz/bufferedwriter"
 	"fizzbuzz/ints"
 	"fmt"
 	"io"
@@ -50,7 +50,7 @@ func fixedWidthTemplate(valueWidth int) ([]byte, []int) {
 
 func FizzBuzz(from, to int) {
 
-	bw := bufferedwriter.New(os.Stdout, 65536)
+	bw := bufio.NewWriterSize(os.Stdout, 65536)
 
 	rangeStart := from
 	rangeEnd := ints.Pow(10, ints.Log10(rangeStart)+1) - 1

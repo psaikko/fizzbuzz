@@ -2,7 +2,6 @@ package main
 
 import (
 	"fizzbuzz/baseline"
-	"fizzbuzz/bufferedwriter"
 	"fizzbuzz/fixedwidth"
 	"fizzbuzz/template"
 	"fmt"
@@ -21,7 +20,7 @@ func main() {
 	strategies := map[string]func(int, int){
 		"Baseline":           baseline.FizzBuzz,           //  ~9 MiB/s
 		"Template":           template.FizzBuzz,           //  80
-		"BufferedWriter":     bufferedwriter.FizzBuzz,     // 204
+		"Buffered":           baseline.BufferedFizzBuzz,   // 204
 		"BufferedTemplate":   template.BufferedFizzBuzz,   // 196
 		"ParallelTemplate":   template.ParallelFizzBuzz,   // 420
 		"FixedWidth":         fixedwidth.FizzBuzz,         // 350

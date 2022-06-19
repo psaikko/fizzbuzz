@@ -1,7 +1,7 @@
 package template
 
 import (
-	"fizzbuzz/bufferedwriter"
+	"bufio"
 	"fmt"
 	"os"
 	"runtime"
@@ -33,7 +33,7 @@ func FizzBuzz(from, to int) {
 
 func BufferedFizzBuzz(from, to int) {
 	const bufSize = 65536
-	bw := bufferedwriter.New(os.Stdout, bufSize)
+	bw := bufio.NewWriterSize(os.Stdout, bufSize)
 
 	for i := from; i < to; i += templateLines {
 		bytes := []byte(fmt.Sprintf(templateString, i, i+1, i+3, i+6, i+7, i+10, i+12, i+13))

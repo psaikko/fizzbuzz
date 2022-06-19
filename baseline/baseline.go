@@ -1,7 +1,9 @@
 package baseline
 
 import (
+	"bufio"
 	"fmt"
+	"os"
 	"strconv"
 )
 
@@ -21,4 +23,12 @@ func FizzBuzz(from, to int) {
 	for i := from; i < to; i++ {
 		fmt.Print(FizzBuzzLine(i))
 	}
+}
+
+func BufferedFizzBuzz(from, to int) {
+	bw := bufio.NewWriterSize(os.Stdout, 65536)
+	for i := from; i < to; i++ {
+		bw.WriteString(FizzBuzzLine(i))
+	}
+	bw.Flush()
 }
