@@ -56,6 +56,13 @@ func FizzBuzz(from, to int) {
 	rangeEnd := ints.Pow(10, ints.Log10(rangeStart)+1) - 1
 	rangeEnd = ints.Min(rangeEnd, to)
 
+	cacheSize := 10000
+	logCacheSize := ints.Log10(cacheSize)
+	itoaCache := make([]string, cacheSize)
+	for j := 0; j < cacheSize; j++ {
+		itoaCache[j] = fmt.Sprintf("%0"+strconv.Itoa(logCacheSize)+"d", j)
+	}
+
 	for width := 1; ; width++ {
 		// range which can be filled with templates
 		templatesStart := ((rangeStart + templateLines - 1) / templateLines) * templateLines
@@ -68,15 +75,40 @@ func FizzBuzz(from, to int) {
 
 		// print templates
 		template, placeholderIdxs := fixedWidthTemplate(width)
+		nextFlush := templatesStart
+		p0 := placeholderIdxs[0]
+		p1 := placeholderIdxs[1]
+		p2 := placeholderIdxs[2]
+		p3 := placeholderIdxs[3]
+		p4 := placeholderIdxs[4]
+		p5 := placeholderIdxs[5]
+		p6 := placeholderIdxs[6]
+		p7 := placeholderIdxs[7]
+
 		for i := templatesStart; i < templatesEnd; i += templateLines {
-			copy(template[placeholderIdxs[0]:], strconv.Itoa(i+1))
-			copy(template[placeholderIdxs[1]:], strconv.Itoa(i+2))
-			copy(template[placeholderIdxs[2]:], strconv.Itoa(i+4))
-			copy(template[placeholderIdxs[3]:], strconv.Itoa(i+7))
-			copy(template[placeholderIdxs[4]:], strconv.Itoa(i+8))
-			copy(template[placeholderIdxs[5]:], strconv.Itoa(i+11))
-			copy(template[placeholderIdxs[6]:], strconv.Itoa(i+13))
-			copy(template[placeholderIdxs[7]:], strconv.Itoa(i+14))
+
+			if i+14 > nextFlush || logCacheSize >= width {
+				// every $logCacheSize lines, write the entire buffer
+				copy(template[p0:], strconv.Itoa(i+1))
+				copy(template[p1:], strconv.Itoa(i+2))
+				copy(template[p2:], strconv.Itoa(i+4))
+				copy(template[p3:], strconv.Itoa(i+7))
+				copy(template[p4:], strconv.Itoa(i+8))
+				copy(template[p5:], strconv.Itoa(i+11))
+				copy(template[p6:], strconv.Itoa(i+13))
+				copy(template[p7:], strconv.Itoa(i+14))
+				nextFlush += cacheSize
+			} else {
+				// write only the last $logCacheSize digits, others unchanged
+				copy(template[p0+width-logCacheSize:], itoaCache[(i+1)%cacheSize])
+				copy(template[p1+width-logCacheSize:], itoaCache[(i+2)%cacheSize])
+				copy(template[p2+width-logCacheSize:], itoaCache[(i+4)%cacheSize])
+				copy(template[p3+width-logCacheSize:], itoaCache[(i+7)%cacheSize])
+				copy(template[p4+width-logCacheSize:], itoaCache[(i+8)%cacheSize])
+				copy(template[p5+width-logCacheSize:], itoaCache[(i+11)%cacheSize])
+				copy(template[p6+width-logCacheSize:], itoaCache[(i+13)%cacheSize])
+				copy(template[p7+width-logCacheSize:], itoaCache[(i+14)%cacheSize])
+			}
 			bw.Write(template)
 		}
 
