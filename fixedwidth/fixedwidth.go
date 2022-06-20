@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"runtime"
 )
 
 const templateLines = 15
@@ -151,15 +152,15 @@ func worker(in <-chan int, out chan<- []byte, templatesPerJob int, template []by
 
 		for i := 0; i < templatesPerJob; i++ {
 			off := i * len(template)
-			if off+jobLine+13 > nextFlush {
-				copy(buffer[off+idxs[0]:], ints.FastItoa(uint64(i*templateLines+jobLine)))
-				copy(buffer[off+idxs[1]:], ints.FastItoa(uint64(i*templateLines+jobLine+1)))
-				copy(buffer[off+idxs[2]:], ints.FastItoa(uint64(i*templateLines+jobLine+3)))
-				copy(buffer[off+idxs[3]:], ints.FastItoa(uint64(i*templateLines+jobLine+6)))
-				copy(buffer[off+idxs[4]:], ints.FastItoa(uint64(i*templateLines+jobLine+7)))
-				copy(buffer[off+idxs[5]:], ints.FastItoa(uint64(i*templateLines+jobLine+10)))
-				copy(buffer[off+idxs[6]:], ints.FastItoa(uint64(i*templateLines+jobLine+12)))
-				copy(buffer[off+idxs[7]:], ints.FastItoa(uint64(i*templateLines+jobLine+13)))
+			if i*templateLines+jobLine+13 > nextFlush {
+				ints.CopyItoa(buffer, off+idxs[0]+width, uint64(i*templateLines+jobLine))
+				ints.CopyItoa(buffer, off+idxs[1]+width, uint64(i*templateLines+jobLine+1))
+				ints.CopyItoa(buffer, off+idxs[2]+width, uint64(i*templateLines+jobLine+3))
+				ints.CopyItoa(buffer, off+idxs[3]+width, uint64(i*templateLines+jobLine+6))
+				ints.CopyItoa(buffer, off+idxs[4]+width, uint64(i*templateLines+jobLine+7))
+				ints.CopyItoa(buffer, off+idxs[5]+width, uint64(i*templateLines+jobLine+10))
+				ints.CopyItoa(buffer, off+idxs[6]+width, uint64(i*templateLines+jobLine+12))
+				ints.CopyItoa(buffer, off+idxs[7]+width, uint64(i*templateLines+jobLine+13))
 				nextFlush += cacheSize
 			} else {
 				copy(buffer[off:], buffer[off-len(template):off])
@@ -187,36 +188,29 @@ func writeParallel(f io.Writer, firstLine, lastLine, nWorkers, templatesPerJob i
 	workerLines := templateLines * templatesPerJob
 	linesPerRound := nWorkers * workerLines
 	if totalLines%linesPerRound != 0 {
-		panic("uneven allocation")
+		panic("uneven work allocation")
 	}
 
-	jobChannels := make([]chan int, 0)
-	resultChannels := make([]chan []byte, 0)
-
-	workersPos := firstLine
+	jobChannels := make([]chan int, nWorkers)
+	resultChannels := make([]chan []byte, nWorkers)
+	totalJobs := ints.CeilDiv(totalLines, workerLines)
+	jobsPerWorker := ints.CeilDiv(totalLines, workerLines*nWorkers)
 
 	for i := 0; i < nWorkers; i++ {
-		jobChan := make(chan int)
-		resultChan := make(chan []byte)
-		go worker(jobChan, resultChan, templatesPerJob, template, width, placeholderIdxs)
-		jobChannels = append(jobChannels, jobChan)
-		resultChannels = append(resultChannels, resultChan)
-		jobChan <- workersPos
-		workersPos += workerLines
+		jobChannels[i] = make(chan int, jobsPerWorker*2)
+		resultChannels[i] = make(chan []byte, 1)
+		go worker(jobChannels[i], resultChannels[i], templatesPerJob, template, width, placeholderIdxs)
 	}
 
 	// deal out jobs to workers
-	ctr := 0
-	for ; workersPos < lastLine; workersPos += workerLines {
-		f.Write(<-resultChannels[ctr%nWorkers])
-		jobChannels[ctr%nWorkers] <- workersPos
-		ctr++
+	for job := 0; job < totalJobs; job++ {
+		jobLine := firstLine + job*workerLines
+		jobChannels[job%nWorkers] <- jobLine
 	}
 
-	// take last buffers and close channels
-	for i := 0; i < nWorkers; i++ {
-		f.Write(<-resultChannels[i])
-		close(jobChannels[i])
+	// read buffers from workers
+	for job := 0; job < totalJobs; job++ {
+		f.Write(<-resultChannels[job%nWorkers])
 	}
 }
 
@@ -234,9 +228,9 @@ func ParallelFizzBuzz(from, to int) {
 		}
 
 		// write large chunks in parallel
-		const templatesPerJob = 100
+		const templatesPerJob = 250
 		template, placeholderIdxs := fixedWidthTemplate(wr.width)
-		nWorkers := 2 // runtime.NumCPU()
+		nWorkers := runtime.NumCPU()
 		chunkSize := nWorkers * templateLines * templatesPerJob
 
 		chunksStart := templatesStart

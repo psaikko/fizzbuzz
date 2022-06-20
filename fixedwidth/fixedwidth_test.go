@@ -31,9 +31,17 @@ func BenchmarkFizzBuzz1G(b *testing.B) {
 	}
 }
 
+func BenchmarkParallelFizzBuzz(b *testing.B) {
+	// devnull, _ := os.Open("/dev/null")
+	// os.Stdout = devnull
+	for i := 0; i < b.N; i++ {
+		FizzBuzz(1000000000, 10000000000)
+	}
+}
+
 func BenchmarkFizzBuzz10G(b *testing.B) {
-	devnull, _ := os.Open("/dev/null")
-	os.Stdout = devnull
+	// devnull, _ := os.Open("/dev/null")
+	// os.Stdout = devnull
 	for i := 0; i < b.N; i++ {
 		FizzBuzz(1000000000, 10000000000)
 	}
