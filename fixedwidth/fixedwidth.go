@@ -139,20 +139,23 @@ func FizzBuzz(from, to int) {
 
 func worker(in <-chan int, out chan<- []byte, templatesPerJob int, template []byte, width int, idxs []int) {
 	buffer := make([]byte, len(template)*templatesPerJob)
-	swapBuffer := make([]byte, len(template)*templatesPerJob)
+	buffer2 := make([]byte, len(template)*templatesPerJob)
+	buffer3 := make([]byte, len(template)*templatesPerJob)
 
 	for i := 0; i < templatesPerJob; i++ {
 		copy(buffer[len(template)*i:], template)
 	}
-	copy(swapBuffer, buffer)
+	copy(buffer2, buffer)
+	copy(buffer3, buffer)
 
 	for jobLine := range in {
 
 		nextFlush := (jobLine / cacheSize) * cacheSize
+		t := false
 
 		for i := 0; i < templatesPerJob; i++ {
 			off := i * len(template)
-			if i*templateLines+jobLine+13 > nextFlush {
+			if i*templateLines+jobLine+13 > nextFlush || t {
 				ints.CopyItoa(buffer, off+idxs[0]+width, uint64(i*templateLines+jobLine))
 				ints.CopyItoa(buffer, off+idxs[1]+width, uint64(i*templateLines+jobLine+1))
 				ints.CopyItoa(buffer, off+idxs[2]+width, uint64(i*templateLines+jobLine+3))
@@ -161,7 +164,10 @@ func worker(in <-chan int, out chan<- []byte, templatesPerJob int, template []by
 				ints.CopyItoa(buffer, off+idxs[5]+width, uint64(i*templateLines+jobLine+10))
 				ints.CopyItoa(buffer, off+idxs[6]+width, uint64(i*templateLines+jobLine+12))
 				ints.CopyItoa(buffer, off+idxs[7]+width, uint64(i*templateLines+jobLine+13))
-				nextFlush += cacheSize
+				t = !t
+				if t {
+					nextFlush += cacheSize
+				}
 			} else {
 				copy(buffer[off:], buffer[off-len(template):off])
 				copy(buffer[off+idxs[0]+width-logCacheSize:], itoaCache[(i*templateLines+jobLine)%cacheSize])
@@ -176,7 +182,7 @@ func worker(in <-chan int, out chan<- []byte, templatesPerJob int, template []by
 		}
 
 		out <- buffer
-		buffer, swapBuffer = swapBuffer, buffer
+		buffer, buffer2, buffer3 = buffer2, buffer3, buffer
 	}
 
 	close(out)
